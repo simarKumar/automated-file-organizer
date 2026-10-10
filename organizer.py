@@ -9,15 +9,12 @@ import hashlib
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# --- INDUSTRY STANDARD UPGRADE: Configurable Logging ---
-# Professional scripts don't just print to the console. They write to standard formats.
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - [%(levelname)s] - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-# Debounce timer gives the user time to rename a file before it's processed.
 DEBOUNCE_SECONDS = 5
 
 def calculate_sha256(file_path, chunk_size=8192):
@@ -30,7 +27,6 @@ def calculate_sha256(file_path, chunk_size=8192):
     sha256_hash = hashlib.sha256()
     try:
         with open(file_path, "rb") as f:
-            # Read in chunks so we don't consume massive RAM for large files like videos
             for byte_block in iter(lambda: f.read(chunk_size), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
@@ -43,7 +39,6 @@ class FileOrganizerHandler(FileSystemEventHandler):
         self.source_dir = source_dir
         self.dest_dir = dest_dir
         self.config = self.load_config(config_path)
-        # Track active timers to handle debouncing (waiting for renames)
         self._pending_timers = {}
 
     def load_config(self, config_path):
@@ -71,7 +66,6 @@ class FileOrganizerHandler(FileSystemEventHandler):
             return
 
         filename = os.path.basename(file_path)
-        # Ignore our own script files so we don't accidentally move them!
         if filename in ["config.json", "organizer.py", "requirements.txt", "Dockerfile"] or filename.startswith('.'):
             return
 
@@ -97,9 +91,7 @@ class FileOrganizerHandler(FileSystemEventHandler):
         
         target_path = os.path.join(target_folder, filename)
 
-        # --- INDUSTRY STANDARD UPGRADE: Smart Collision Handling ---
         if os.path.exists(target_path):
-            # Calculate content hash to see if it's the exact same file
             source_hash = calculate_sha256(file_path)
             target_hash = calculate_sha256(target_path)
             
@@ -108,7 +100,6 @@ class FileOrganizerHandler(FileSystemEventHandler):
                 os.remove(file_path)
                 return
             else:
-                # Name collision, but different contents. Rename the new one safely.
                 base_name, ext = os.path.splitext(filename)
                 target_path = os.path.join(target_folder, f"{base_name}_{int(time.time())}{ext}")
 
@@ -134,9 +125,6 @@ def organize_existing_files(source_dir, handler):
         handler.process_file(os.path.join(source_dir, filename))
 
 if __name__ == "__main__":
-    # --- INDUSTRY STANDARD UPGRADE: CLI Arguments ---
-    # Hardcoding paths (like "test_folder") is bad practice. We use argparse to let 
-    # the user dynamically pass the source and destination paths when running the script.
     parser = argparse.ArgumentParser(description="Automated File Organizer daemon.")
     parser.add_argument("--source", type=str, default="test_folder", help="Directory to monitor")
     parser.add_argument("--dest", type=str, default="test_folder", help="Directory to move files into")
@@ -166,7 +154,6 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()
-        # Cleanly cancel any pending operations
         for timer in event_handler._pending_timers.values():
             timer.cancel()
         logging.info("Gracefully shutting down file organizer.")
